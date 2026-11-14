@@ -1,4 +1,9 @@
-# Guess Who? — Decisions API Showcase
+# <img src="./public/favicon.svg" alt="Guess Who? icon" width="32" height="32" /> Guess Who? — Decisions API Showcase
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-0f6269?logo=githubpages&logoColor=white)](https://puppo.github.io/guess-who/)
+[![Deploy to GitHub Pages](https://github.com/Puppo/guess-who/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Puppo/guess-who/actions/workflows/deploy-pages.yml)
+[![Node.js >= 26](https://img.shields.io/badge/Node.js-%3E%3D26.8.1-339933?logo=nodedotjs&logoColor=white)](./.nvmrc)
+[![License: MIT](https://img.shields.io/badge/License-MIT-e09f1f.svg)](./LICENSE)
 
 A browser-based 12-character guessing game demonstrating on-device, single-pass natural language classification using the experimental [Decisions API](https://github.com/explainers-by-googlers/decisions-api) (`window.DecisionModel`).
 

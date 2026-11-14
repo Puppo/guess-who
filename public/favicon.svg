@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="tile" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#147a82" />
+      <stop offset="100%" stop-color="#093e43" />
+    </linearGradient>
+    <linearGradient id="card" x1="12" y1="10" x2="42" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f3eee4" />
+    </linearGradient>
+    <linearGradient id="rim" x1="30" y1="28" x2="54" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffe082" />
+      <stop offset="100%" stop-color="#e09f1f" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#tile)" />
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="14.25" stroke="#ffffff" stroke-opacity="0.2" stroke-width="1.5" />
+  <g transform="rotate(-7 26 29)">
+    <rect x="11" y="10" width="30" height="38" rx="5.5" fill="#052528" fill-opacity="0.32" transform="translate(1.5 2.5)" />
+    <rect x="11" y="10" width="30" height="38" rx="5.5" fill="url(#card)" stroke="#ded8cb" stroke-width="1.5" />
+    <circle cx="26" cy="22.5" r="5.8" fill="#1a1f24" />
+    <path d="M16.5 38.5c0-5.1 4.2-8.5 9.5-8.5s9.5 3.4 9.5 8.5v1.5h-19v-1.5Z" fill="#1a1f24" />
+    <rect x="15" y="13.5" width="8" height="2.2" rx="1.1" fill="#0f6269" fill-opacity="0.55" />
+  </g>
+  <path d="M48.5 47.5L53.5 52.5" stroke="#052528" stroke-opacity="0.45" stroke-width="7" stroke-linecap="round" />
+  <path d="M48 47L53 52" stroke="url(#rim)" stroke-width="5.2" stroke-linecap="round" />
+  <circle cx="40.5" cy="40.5" r="13" fill="#052528" fill-opacity="0.35" />
+  <circle cx="40" cy="39.5" r="12.5" fill="#08363a" stroke="url(#rim)" stroke-width="3.6" />
+  <path d="M36.7 35.8c0-2 1.5-3.4 3.5-3.4 1.9 0 3.4 1.2 3.4 3.1 0 1.4-.8 2.3-2 2.9-.9.5-1.4 1.1-1.4 2.1v.4" stroke="#faf7f2" stroke-width="3" stroke-linecap="round" />
+  <circle cx="40.2" cy="45.1" r="1.8" fill="#ffe082" />
+</svg>
