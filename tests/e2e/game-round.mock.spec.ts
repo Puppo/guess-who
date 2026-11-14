@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { CHARACTERS, type Character } from "../../src/data/characters.ts";
 import { POLICY_MESSAGES } from "../../src/engine/policy.ts";
 
-export interface MockInitOptions {
+interface MockInitOptions {
   availabilityMode?: "available" | "downloadable";
   hasNative?: boolean;
   disableWebGpu?: boolean;
@@ -42,7 +42,7 @@ function installDecisionModelMock(options: MockInitOptions) {
 
   let secretIdxCursor = 0;
   const origRandom = Math.random;
-  Math.random = function () {
+  Math.random = () => {
     const stack = new Error().stack || "";
     if (
       stack.toLowerCase().includes("gamestate") ||
@@ -53,7 +53,7 @@ function installDecisionModelMock(options: MockInitOptions) {
         return (idx + 0.1) / (characters.length || 12);
       }
     }
-    return origRandom.call(Math);
+    return origRandom();
   };
 
   const spy = {
@@ -514,17 +514,28 @@ test.describe("Phase 4: Game Round Mock E2E Test Suite", () => {
     expect(remBox).not.toBeNull();
     expect(btnBox).not.toBeNull();
 
-    expect(progressContainerBox!.y).toBeGreaterThanOrEqual(
-      mainRowBox!.y + mainRowBox!.height
+    if (
+      !mainRowBox ||
+      !progressContainerBox ||
+      !titleBox ||
+      !qBox ||
+      !remBox ||
+      !btnBox
+    ) {
+      throw new Error("Expected header geometry bounding boxes to be present.");
+    }
+
+    expect(progressContainerBox.y).toBeGreaterThanOrEqual(
+      mainRowBox.y + mainRowBox.height
     );
     expect(
-      Math.abs(progressContainerBox!.width - mainRowBox!.width)
+      Math.abs(progressContainerBox.width - mainRowBox.width)
     ).toBeLessThanOrEqual(2);
-    expect(titleBox!.height).toBeLessThanOrEqual(46);
-    expect(qBox!.height).toBeLessThanOrEqual(46);
-    expect(remBox!.height).toBeLessThanOrEqual(46);
-    expect(btnBox!.height).toBeLessThanOrEqual(46);
-    expect(Math.abs(qBox!.y - btnBox!.y)).toBeLessThanOrEqual(8);
+    expect(titleBox.height).toBeLessThanOrEqual(46);
+    expect(qBox.height).toBeLessThanOrEqual(46);
+    expect(remBox.height).toBeLessThanOrEqual(46);
+    expect(btnBox.height).toBeLessThanOrEqual(46);
+    expect(Math.abs(qBox.y - btnBox.y)).toBeLessThanOrEqual(8);
 
     await page.evaluate(() => {
       (
@@ -672,10 +683,15 @@ test.describe("Phase 4: Game Round Mock E2E Test Suite", () => {
 
     const supportsYesQ = spyData.createdSchema0.questions.find(
       (q) => q.id === "supports_yes"
-    )!;
+    );
     const contradictsNoQ = spyData.createdSchema0.questions.find(
       (q) => q.id === "contradicts_no"
-    )!;
+    );
+    expect(supportsYesQ).toBeDefined();
+    expect(contradictsNoQ).toBeDefined();
+    if (!supportsYesQ || !contradictsNoQ) {
+      throw new Error("Expected supports_yes and contradicts_no questions.");
+    }
     expect(supportsYesQ.prompt).not.toContain(spyData.secretCharacter.name);
     expect(supportsYesQ.prompt).not.toContain(spyData.secretCharacter.id);
     expect(contradictsNoQ.prompt).not.toContain(spyData.secretCharacter.name);
@@ -1154,12 +1170,18 @@ test.describe("Phase 4: Game Round Mock E2E Test Suite", () => {
     expect(openLayout.inspector).not.toBeNull();
     expect(openLayout.cards).toHaveLength(3);
 
-    expect(openLayout.inspector!.y).toBeGreaterThanOrEqual(
-      openLayout.gameCol!.y + openLayout.gameCol!.height
+    const openGameCol = openLayout.gameCol;
+    const openInspector = openLayout.inspector;
+    if (!openGameCol || !openInspector) {
+      throw new Error("Expected open layout geometry.");
+    }
+
+    expect(openInspector.y).toBeGreaterThanOrEqual(
+      openGameCol.y + openGameCol.height
     );
-    expect(
-      Math.abs(openLayout.inspector!.width - openLayout.gameCol!.width)
-    ).toBeLessThanOrEqual(2);
+    expect(Math.abs(openInspector.width - openGameCol.width)).toBeLessThanOrEqual(
+      2
+    );
     expect(
       Math.abs(openLayout.cards[0].y - openLayout.cards[1].y)
     ).toBeLessThanOrEqual(2);
@@ -1173,17 +1195,24 @@ test.describe("Phase 4: Game Round Mock E2E Test Suite", () => {
     const collapsedLayout = await measureLayout();
     expect(collapsedLayout.gameCol).not.toBeNull();
     expect(collapsedLayout.inspector).not.toBeNull();
+
+    const collapsedGameCol = collapsedLayout.gameCol;
+    const collapsedInspector = collapsedLayout.inspector;
+    if (!collapsedGameCol || !collapsedInspector) {
+      throw new Error("Expected collapsed layout geometry.");
+    }
+
     expect(
-      Math.abs(collapsedLayout.inspector!.x - openLayout.inspector!.x)
+      Math.abs(collapsedInspector.x - openInspector.x)
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs(collapsedLayout.inspector!.y - openLayout.inspector!.y)
+      Math.abs(collapsedInspector.y - openInspector.y)
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs(collapsedLayout.inspector!.width - openLayout.inspector!.width)
+      Math.abs(collapsedInspector.width - openInspector.width)
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs(collapsedLayout.gameCol!.width - openLayout.gameCol!.width)
+      Math.abs(collapsedGameCol.width - openGameCol.width)
     ).toBeLessThanOrEqual(1);
 
     // Re-expand Inspector before checking spoilers disclosure
@@ -1199,7 +1228,10 @@ test.describe("Phase 4: Game Round Mock E2E Test Suite", () => {
 
     const schemaText = await spoilersPre.textContent();
     expect(schemaText).not.toBeNull();
-    const parsedSchema = JSON.parse(schemaText!);
+    if (schemaText === null) {
+      throw new Error("Expected spoilers schema text content.");
+    }
+    const parsedSchema = JSON.parse(schemaText);
     expect(parsedSchema.questions.length).toBe(3);
 
     // Verify question count and roundStatus remain completely unchanged by toggling disclosure

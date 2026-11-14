@@ -8,6 +8,14 @@ import {
   makeRawDecision,
 } from "../helpers/mockDecisionModel.ts";
 
+function assertDefined<T>(value: T | null | undefined, label: string): T {
+  expect(value, `Expected ${label} to be defined`).toBeDefined();
+  if (value === null || value === undefined) {
+    throw new Error(`Expected ${label} to be defined`);
+  }
+  return value;
+}
+
 describe("useGameState hook", () => {
   describe("initialization and availability check", () => {
     it("starts in idle uninitialized state and updates on mount", async () => {
@@ -69,7 +77,10 @@ describe("useGameState hook", () => {
       const adapter = createDecisionEngineAdapter({
         nativeDecisionModel: nativeMock,
       });
-      const secret = CHARACTERS.find((c) => c.id === "elena")!;
+      const secret = assertDefined(
+        CHARACTERS.find((c) => c.id === "elena"),
+        'character "elena"'
+      );
 
       const { result } = renderHook(() =>
         useGameState({
@@ -88,16 +99,22 @@ describe("useGameState hook", () => {
       expect(result.current.secretCharacter?.id).toBe("elena");
       expect(result.current.roundSchema).not.toBeNull();
 
-      const schemaStr = JSON.stringify(result.current.roundSchema).toLowerCase();
+      const roundSchema = assertDefined(
+        result.current.roundSchema,
+        "roundSchema"
+      );
+      const schemaStr = JSON.stringify(roundSchema).toLowerCase();
       expect(schemaStr).not.toContain("elena");
 
       // Verify the fact prompts only contain the serialized facts, never the secret id/name
-      const supportsYesQ = result.current.roundSchema!.questions.find(
-        (q) => q.id === "supports_yes"
-      )!;
-      const contradictsNoQ = result.current.roundSchema!.questions.find(
-        (q) => q.id === "contradicts_no"
-      )!;
+      const supportsYesQ = assertDefined(
+        roundSchema.questions.find((q) => q.id === "supports_yes"),
+        "supports_yes question"
+      );
+      const contradictsNoQ = assertDefined(
+        roundSchema.questions.find((q) => q.id === "contradicts_no"),
+        "contradicts_no question"
+      );
       expect(supportsYesQ.prompt).not.toContain("Elena");
       expect(supportsYesQ.prompt).not.toContain("elena");
       expect(contradictsNoQ.prompt).not.toContain("Elena");
@@ -343,7 +360,10 @@ describe("useGameState hook", () => {
       const adapter = createDecisionEngineAdapter({
         nativeDecisionModel: nativeMock,
       });
-      const secret = CHARACTERS.find((c) => c.id === "nora")!;
+      const secret = assertDefined(
+        CHARACTERS.find((c) => c.id === "nora"),
+        'character "nora"'
+      );
 
       const { result } = renderHook(() =>
         useGameState({
@@ -390,7 +410,10 @@ describe("useGameState hook", () => {
       const adapter = createDecisionEngineAdapter({
         nativeDecisionModel: nativeMock,
       });
-      const secret = CHARACTERS.find((c) => c.id === "nora")!;
+      const secret = assertDefined(
+        CHARACTERS.find((c) => c.id === "nora"),
+        'character "nora"'
+      );
 
       const { result } = renderHook(() =>
         useGameState({
@@ -427,7 +450,10 @@ describe("useGameState hook", () => {
       const adapter = createDecisionEngineAdapter({
         nativeDecisionModel: nativeMock,
       });
-      const secret = CHARACTERS.find((c) => c.id === "nora")!;
+      const secret = assertDefined(
+        CHARACTERS.find((c) => c.id === "nora"),
+        'character "nora"'
+      );
 
       const { result } = renderHook(() =>
         useGameState({

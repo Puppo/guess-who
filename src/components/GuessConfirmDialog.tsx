@@ -56,10 +56,19 @@ export function GuessConfirmDialog({
 
   const handleCancelClick = () => {
     const dialog = dialogRef.current;
-    if (dialog && dialog.open && typeof dialog.close === "function") {
+    if (dialog?.open && typeof dialog.close === "function") {
       dialog.close();
     } else {
       handleNativeClose();
+    }
+  };
+
+  const handleDialogKeyDown = (
+    event: React.KeyboardEvent<HTMLDialogElement>
+  ) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleCancelClick();
     }
   };
 
@@ -67,7 +76,7 @@ export function GuessConfirmDialog({
     if (!character) return;
     const targetId = character.id;
     const dialog = dialogRef.current;
-    if (dialog && dialog.open && typeof dialog.close === "function") {
+    if (dialog?.open && typeof dialog.close === "function") {
       dialog.close();
     }
     onConfirm(targetId);
@@ -96,6 +105,7 @@ export function GuessConfirmDialog({
       aria-labelledby="guess-confirm-dialog-title"
       onClose={handleNativeClose}
       onClick={handleBackdropClick}
+      onKeyDown={handleDialogKeyDown}
       className="app-dialog guess-confirm-dialog"
     >
       <div className="dialog-content">

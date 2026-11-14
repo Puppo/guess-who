@@ -22,8 +22,8 @@ Players ask free-form yes/no questions about written character biographies. The 
 - **Node.js:** `v26.8.1` (configured via [.nvmrc](./.nvmrc) and [.node-version](./.node-version); `package.json` specifies `"engines": { "node": ">=26.0.0" }`).
 - **Browser:** Desktop Google Chrome (tested on Chrome `157` on macOS arm64 with Metal WebGPU enabled).
   - *Native Runtime:* Uses native `window.DecisionModel` when available or enabled via experimental Chrome DevTrial flags (`chrome://flags/#decisions-api`).
-    - For Chrome Canary testing, set `chrome://flags/#decisions-api` to **"Enabled with All Backends"** or **"Enabled with Laya Backend (English WInt8)"** so Chrome exposes the cross-encoder `laya-en-wint8` backend.
-    - If Chrome Canary is left on the default **"Enabled"** (`embedding-gemma-v1` bi-encoder), the adapter automatically probes `devTrialBackend` (`laya-en-wint8` -> `language-model` -> `embedding-gemma-v1`) and switches to the bi-encoder choice-partitioned schema (`v3.0.0`).
+    - In Chrome Canary (tested up to `160`), `chrome://flags/#decisions-api` exposes **"Enabled"**, **"Enabled with All Backends"**, **"Enabled with EmbeddingGemma V1"**, and **"Enabled with Gemma 4 on CPU"**. Set it to **"Enabled with All Backends"** when testing cross-encoder backends alongside `embedding-gemma-v1`.
+    - When Chrome Canary resolves to `embedding-gemma-v1` (the default **"Enabled"** option), the adapter probes `devTrialBackend` (`laya-en-wint8` -> `language-model` -> `embedding-gemma-v1`) and automatically switches to Schema `v3.1.0`'s anchor-calibrated atomic `Choice` partition (`13` `question_kind` options, `20` `supports_yes` options, `17` `contradicts_no` options within Blink's `<= 16` questions and `2..26` options limits). Offline evaluation on `onnx-community/embeddinggemma-300m-ONNX` (`q4`) scored `61/64` exact matches (`8/8` on Theo's screenshot round, `40/40` on valid trait questions, and `0` `unknown`-to-`No` errors).
   - *Local Polyfill Fallback:* Uses `open-jev@0.1.2` running `onnx-community/kev-0.6b-ONNX` (`device: "webgpu"`, `dtype: "q4f16"`, ~383 MB download), executing local forward passes via Transformers.js in WebGPU. Requires a functional WebGPU adapter (`navigator.gpu.requestAdapter()`).
 
 ---
@@ -46,10 +46,12 @@ npm run dev
 | `npm run build` | Type-check and build production bundle (`tsc --noEmit && vite build`) |
 | `npm run preview` | Preview production build locally (`--port 4173 --strictPort`) |
 | `npm run typecheck` | Run TypeScript compiler checks (`tsc --noEmit`) |
-| `npm test` | Run offline deterministic Vitest unit & state test suite (72 tests, ~1.4s) |
+| `npm run lint` | Lint source, scripts, and tests with Biome (`biome lint --error-on-warnings .`) |
+| `npm run lint:fix` | Auto-apply safe Biome lint fixes (`biome lint --write .`) |
+| `npm test` | Run offline deterministic Vitest unit & state test suite (78 tests, ~1.4s) |
 | `npm run test:ui` | Run offline Playwright E2E full-round test with injected mocks |
 | `npm run test:smoke:real` | Run real WebGPU smoke test in Chrome verifying full `availability -> create -> decide -> destroy` lifecycle |
-| `npm run eval:browser` | Execute the 56-case browser evaluation suite in Chrome and generate [docs/evaluation-report.md](./docs/evaluation-report.md) |
+| `npm run eval:browser` | Execute the 64-case browser evaluation suite in Chrome and generate [docs/evaluation-report.md](./docs/evaluation-report.md) |
 
 ---
 
@@ -63,44 +65,59 @@ npm run dev
    - Model weights are cached locally in browser storage (Cache Storage / IndexedDB).
    - Subsequent page reloads and rounds skip downloading and perform a fast WebGPU session warm-up (~2.1s).
    - Per-round session creation (`createRoundSession()`) executes in memory in **`< 0.1 ms`** (`0.00–0.10 ms` observed median) with zero model weight reloads.
-   - Live question inference executes in **`~224 ms`** median warm latency (`223.7 ms` in the `v3.0.0` benchmark) with **zero external network requests** during gameplay (verified by Playwright network assertions in `tests/e2e/real-runtime.smoke.spec.ts`).
+   - Live question inference executes in **`~270 ms`** median warm latency (`269.9 ms` in the `v3.1.0` benchmark) with **zero external network requests** during gameplay (verified by Playwright network assertions in `tests/e2e/real-runtime.smoke.spec.ts`).
 
 ---
 
 ## Evaluation Summary & Honest Failure Transparency
 
-Model accuracy and inference latency were measured using the Playwright browser evaluation harness (`npm run eval:browser`, driving `src/eval/evalHarness.tsx` in Chrome 157 WebGPU) across 56 human-labeled cases partitioned into 24 threshold-tuning cases and 32 held-out test cases (including 8 gender questions).
+Model accuracy and inference latency were measured using the Playwright browser evaluation harness (`npm run eval:browser`, driving `src/eval/evalHarness.tsx` in Chrome 157 WebGPU) across 64 human-labeled cases partitioned into 28 threshold-tuning cases and 36 held-out test cases (including 11 singular/plural gender questions).
 
-### Calibration & Pinned Thresholds (Schema `v3.0.0`)
+### Calibration & Pinned Thresholds (Schema `v3.1.0`)
 - `questionKindThreshold`: `0.50`
 - `factThreshold`: `0.50`
 
-### Held-Out Evaluation Results (`n = 32`)
+### Held-Out Evaluation Results (`n = 36`)
 
 | Metric | Observed | Target | Status |
 | --- | --- | --- | --- |
-| Raw `question_kind` accuracy | 87.5% | — | Recorded |
-| Raw `supports_yes` accuracy | 100.0% | — | Recorded |
-| Raw `contradicts_no` accuracy | 100.0% | — | Recorded |
+| Raw `question_kind` accuracy | 88.9% | — | Recorded |
+| Raw `supports_yes` accuracy | 96.4% | — | Recorded |
+| Raw `contradicts_no` accuracy | 92.9% | — | Recorded |
 | Post-policy `unknown`-to-`No` errors | **0** | 0 | **Pass** |
-| Valid-trait clarification rate | 4.2% (1/24) | <= 30.0% | **Pass** |
-| Valid-trait acceptance rate | 95.8% (23/24) | >= 70.0% | **Pass** |
-| Accepted factual answer accuracy | **100.0% (23/23)** | >= 90.0% | **Pass** |
-| Gender questions (tuning + held-out) | 8/8 (100%) | — | **Pass** |
+| Valid-trait clarification rate | 0.0% (0/28) | <= 30.0% | **Pass** |
+| Valid-trait acceptance rate | 100.0% (28/28) | >= 70.0% | **Pass** |
+| Accepted factual answer accuracy | **92.9% (26/28)** | >= 90.0% | **Pass** |
+| Gender questions (tuning + held-out) | 11/11 (100%) | — | **Pass** |
 | Non-trait routing (`identity_guess` / `needs_rephrase`) | 6/8 | — | Recorded |
-| Warm inference latency (median) | 223.7 ms | — | Recorded |
-| Warm inference latency (p95) | 277.8 ms | — | Recorded |
+| Warm inference latency (median) | 269.9 ms | — | Recorded |
+| Warm inference latency (p95) | 290.8 ms | — | Recorded |
 
 ### Transparent Held-Out Failure Analysis
 
-Per Section 9 of the project plan, all 3 held-out failure cases from [docs/evaluation-report.md](./docs/evaluation-report.md) are documented openly:
+Per Section 9 of the project plan, all 4 held-out failure cases from [docs/evaluation-report.md](./docs/evaluation-report.md) are documented openly:
 
-1. **Conservative Intent Clarification (1 case):**
-   - `held-para-2` (Sam / *"Is this person a scientist who studies marine life?"*): Factual heads predicted the right answer cleanly (`supports_yes: true (0.90)`, `contradicts_no: false (0.74)`), but `question_kind: trait_question (0.49)` scored `0.01` below the `0.50` gate. Policy conservatively requested a more direct phrasing (`countsAsQuestion = false`) instead of guessing on borderline intent confidence.
-2. **Compound / Open-Question `question_kind` Routing (2 cases):**
-   - `held-comp-3` (Omar / *"Where do they work?"*) and `held-comp-2` (Theo / *"Are they an illustrator and a mechanic?"*): `question_kind` routed both to `trait_question` (`0.70` and `0.58`) instead of `needs_rephrase`. Because neither `supports_yes` nor `contradicts_no` fired, the policy safely returned `"Not enough information"` rather than fabricating `"Yes"` or `"No"`.
+1. **Plural Occupation Miss (`held-no-8`):**
+   - *Nora / "Are they mechanics?"*: Returned `Yes` (`qk=trait_question(0.61), yes=true(0.65), no=false(0.54)`). Plural *"mechanics"* without a matching plural exclusion token in the cross-encoder prompt slipped past both `supports_yes` and `contradicts_no`. (On the bi-encoder `embedding-gemma-v1` schema, atomic per-job options explicitly pair singular and plural forms and classify this correctly as `No`.)
+2. **Conservative Open-World Fallback on Occupation (`held-no-1`):**
+   - *Milo / "Does this person work as an emergency paramedic?"*: Factual heads produced `supports_yes: false (0.93)` and `contradicts_no: false (0.56)`. Instead of fabricating an answer, the policy returned `"Not enough information"`.
+3. **Compound / Open-Question `question_kind` Routing (2 cases):**
+   - `held-comp-2` (Theo / *"Are they an illustrator and a mechanic?"*): Routed to `trait_question (0.65)`, but both factual heads fired `true (0.52)`, so policy caught the conflict and safely requested clarification instead of answering `Yes` or `No`.
+   - `held-comp-3` (Omar / *"Where do they work?"*): `question_kind` routed the open wh-question to `trait_question (0.89)` with `contradicts_no: true (0.51)`, yielding `No`.
 
 This demonstrates the core design goal of the Decisions API: deterministic application policies paired with explicit contradiction grounding and calibrated thresholds protect the user experience when compact on-device models exhibit boundary uncertainty.
+
+---
+
+## CI & GitHub Pages Deployment
+
+The [Deploy to GitHub Pages](./.github/workflows/deploy-pages.yml) workflow runs on pushes to `main`, pull requests targeting `main`, and manual `workflow_dispatch` triggers using commit-SHA-pinned GitHub Actions:
+
+1. **`quality`**: Runs `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:ui` (Playwright Chromium with mocked `DecisionModel`), and a `VITE_BASE_PATH` production build verification.
+2. **`build-pages`** *(non-PR events)*: Configures GitHub Pages base path metadata (`actions/configure-pages`), builds `dist/` with `VITE_BASE_PATH` (`/<repo>/` or `/`), and uploads the Pages artifact.
+3. **`deploy-pages`** *(non-PR events)*: Deploys the built artifact to the `github-pages` environment.
+
+> **One-time repository setting:** In GitHub repository **Settings -> Pages**, set **Build and deployment -> Source** to **GitHub Actions** before pushing to trigger the first deployment.
 
 ---
 

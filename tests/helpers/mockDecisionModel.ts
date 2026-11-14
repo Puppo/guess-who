@@ -217,7 +217,8 @@ export function createMockDecisionModelStatic(
             currentDecideHandler(input, decideOpts)
           );
 
-          if (!decideOpts?.signal) {
+          const signal = decideOpts?.signal;
+          if (!signal) {
             return (await resultPromise) as Record<
               string,
               QuestionDecision<string>
@@ -230,12 +231,12 @@ export function createMockDecisionModelStatic(
                 new DOMException("The operation was aborted.", "AbortError")
               );
             };
-            decideOpts.signal!.addEventListener("abort", onAbort, {
+            signal.addEventListener("abort", onAbort, {
               once: true,
             });
             resultPromise.then(
               (res) => {
-                decideOpts.signal!.removeEventListener("abort", onAbort);
+                signal.removeEventListener("abort", onAbort);
                 if (instanceDestroyed) {
                   reject(
                     new DOMException(
@@ -248,7 +249,7 @@ export function createMockDecisionModelStatic(
                 }
               },
               (err) => {
-                decideOpts.signal!.removeEventListener("abort", onAbort);
+                signal.removeEventListener("abort", onAbort);
                 reject(err);
               }
             );
@@ -346,7 +347,9 @@ export function createMockOpenJevModule(
                 confidence: 0.9,
                 probabilities: { true: 0.1, false: 0.9 },
               },
-            }) as any;
+            }) as unknown as Awaited<
+              ReturnType<OpenJevInstanceLike["decide"]>
+            >;
           },
           async dispose() {},
         };

@@ -183,7 +183,10 @@ export function InspectorPanel({
                   onChange={(e) => setSelectedTurnIndex(Number(e.target.value))}
                 >
                   {turns.map((turn, idx) => (
-                    <option key={`${turn.requestNumber}-${idx}`} value={idx}>
+                    <option
+                      key={`${turn.requestNumber}-${turn.policy.outcome}-${turn.playerQuestion}-${turn.timestampMs}`}
+                      value={idx}
+                    >
                       Req #{turn.requestNumber} ({turn.policy.outcome})
                     </option>
                   ))}

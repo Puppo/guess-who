@@ -109,9 +109,13 @@ export function QuestionPanel({
             <span
               id="question-counter"
               className={`char-counter ${isOverLength ? "char-counter-exceeded" : ""}`}
-              aria-label={`${trimmedLength} of ${maxLength} characters`}
             >
-              {trimmedLength} / {maxLength}
+              <span aria-hidden="true">
+                {trimmedLength} / {maxLength}
+              </span>
+              <span className="sr-only">
+                {trimmedLength} of {maxLength} characters
+              </span>
             </span>
           </div>
         </div>
@@ -120,11 +124,8 @@ export function QuestionPanel({
       {starterPrompts.length > 0 && (
         <div className="starter-prompts-section">
           <span className="starter-prompts-title">Starter prompts:</span>
-          <div
-            className="starter-chips"
-            role="group"
-            aria-label="Starter question prompts"
-          >
+          <fieldset className="starter-chips">
+            <legend className="sr-only">Starter question prompts</legend>
             {starterPrompts.map((prompt) => (
               <button
                 key={prompt}
@@ -136,7 +137,7 @@ export function QuestionPanel({
                 {prompt}
               </button>
             ))}
-          </div>
+          </fieldset>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import type { Character } from "../data/characters.ts";
+import { type Character, resolvePublicAssetUrl } from "../data/characters.ts";
 import type { RoundStatus } from "../engine/types.ts";
 
 export interface CharacterCardProps {
@@ -45,7 +45,7 @@ export function CharacterCard({
     >
       <div className="card-header">
         <img
-          src={character.avatarUrl}
+          src={resolvePublicAssetUrl(character.avatarUrl)}
           alt={character.avatarAlt}
           width={80}
           height={80}
@@ -54,7 +54,7 @@ export function CharacterCard({
         />
         <div className="card-identification">
           <h3 className="character-name">{character.name}</h3>
-          <div className="card-badges" aria-label="Status badges">
+          <div className="card-badges">
             {isSecretReveal && (
               <span className="card-badge badge-secret">
                 ★ Secret character

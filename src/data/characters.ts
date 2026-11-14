@@ -350,3 +350,25 @@ export function validateCharacterDataset(characters: readonly Character[]): {
     errors,
   };
 }
+
+/**
+ * Resolves a public-directory asset path against Vite's configured `BASE_URL`
+ * so subpath deployments such as GitHub Pages serve `/repo/avatars/...`.
+ */
+export function resolvePublicAssetUrl(
+  assetPath: string,
+  baseUrl: string = import.meta.env.BASE_URL
+): string {
+  if (
+    /^(?:[a-z]+:)?\/\//i.test(assetPath) ||
+    /^(?:data|blob):/i.test(assetPath)
+  ) {
+    return assetPath;
+  }
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  if (normalizedBase !== "/" && assetPath.startsWith(normalizedBase)) {
+    return assetPath;
+  }
+  const cleanAssetPath = assetPath.replace(/^\/+/, "");
+  return `${normalizedBase}${cleanAssetPath}`;
+}

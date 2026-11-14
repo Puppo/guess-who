@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { Character } from "../data/characters.ts";
+import { type KeyboardEvent, useEffect, useRef } from "react";
+import { type Character, resolvePublicAssetUrl } from "../data/characters.ts";
 
 export interface BiographyDialogProps {
   character: Character | null;
@@ -54,10 +54,17 @@ export function BiographyDialog({
 
   const handleManualClose = () => {
     const dialog = dialogRef.current;
-    if (dialog && dialog.open && typeof dialog.close === "function") {
+    if (dialog?.open && typeof dialog.close === "function") {
       dialog.close();
     } else {
       handleNativeClose();
+    }
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleManualClose();
     }
   };
 
@@ -84,12 +91,13 @@ export function BiographyDialog({
       aria-labelledby="biography-dialog-title"
       onClose={handleNativeClose}
       onClick={handleBackdropClick}
+      onKeyDown={handleDialogKeyDown}
       className="app-dialog biography-dialog"
     >
       <div className="dialog-content">
         <header className="dialog-header">
           <img
-            src={character.avatarUrl}
+            src={resolvePublicAssetUrl(character.avatarUrl)}
             alt={character.avatarAlt}
             width={96}
             height={96}
@@ -112,8 +120,8 @@ export function BiographyDialog({
           <div className="dialog-facts-section">
             <h3 className="dialog-facts-heading">Source Facts</h3>
             <ul className="dialog-facts-list">
-              {character.facts.map((fact, index) => (
-                <li key={index} className="dialog-fact-item">
+              {character.facts.map((fact) => (
+                <li key={fact} className="dialog-fact-item">
                   {fact}
                 </li>
               ))}

@@ -3,9 +3,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CHARACTERS,
-  Character,
+  type Character,
   SHARED_TRAIT_CLUSTERS,
   getCharacterById,
+  resolvePublicAssetUrl,
   validateCharacterDataset,
 } from "../../src/data/characters.ts";
 import { buildRoundSchema } from "../../src/engine/schema.ts";
@@ -225,6 +226,41 @@ describe("Character dataset (CHARACTERS)", () => {
           e.includes('Character "nora" must have 4 to 8 facts')
         )
       ).toBe(true);
+    });
+  });
+
+  describe("resolvePublicAssetUrl", () => {
+    it("resolves root-relative paths against root base URL", () => {
+      expect(resolvePublicAssetUrl("/avatars/nora.jpg", "/")).toBe(
+        "/avatars/nora.jpg"
+      );
+      expect(resolvePublicAssetUrl("avatars/nora.jpg", "/")).toBe(
+        "/avatars/nora.jpg"
+      );
+    });
+
+    it("resolves root-relative paths against subpath base URLs", () => {
+      expect(resolvePublicAssetUrl("/avatars/nora.jpg", "/guess-who/")).toBe(
+        "/guess-who/avatars/nora.jpg"
+      );
+      expect(resolvePublicAssetUrl("/avatars/nora.jpg", "/guess-who")).toBe(
+        "/guess-who/avatars/nora.jpg"
+      );
+      expect(
+        resolvePublicAssetUrl("/guess-who/avatars/nora.jpg", "/guess-who/")
+      ).toBe("/guess-who/avatars/nora.jpg");
+    });
+
+    it("preserves external and data URLs", () => {
+      expect(
+        resolvePublicAssetUrl("https://example.com/nora.jpg", "/guess-who/")
+      ).toBe("https://example.com/nora.jpg");
+      expect(
+        resolvePublicAssetUrl(
+          "data:image/jpeg;base64,abc123",
+          "/guess-who/"
+        )
+      ).toBe("data:image/jpeg;base64,abc123");
     });
   });
 });

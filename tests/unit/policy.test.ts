@@ -158,7 +158,7 @@ describe("validatePlayerInput", () => {
   });
 
   it("accepts input that exceeds 300 chars before trimming but is <= 300 after trimming", () => {
-    const padded = "   " + "x".repeat(300) + "   ";
+    const padded = `   ${"x".repeat(300)}   `;
     const result = validatePlayerInput(padded);
     expect(result).toEqual({
       valid: true,
@@ -438,15 +438,15 @@ describe("createErrorPolicyDecision", () => {
 });
 
 describe("EVAL_FIXTURES invariants", () => {
-  it("contains exactly 56 total fixtures", () => {
-    expect(EVAL_FIXTURES).toHaveLength(56);
+  it("contains exactly 64 total fixtures", () => {
+    expect(EVAL_FIXTURES).toHaveLength(64);
   });
 
-  it("has exactly 24 tuning and 32 held_out fixtures", () => {
+  it("has exactly 28 tuning and 36 held_out fixtures", () => {
     const tuning = EVAL_FIXTURES.filter((f) => f.split === "tuning");
     const heldOut = EVAL_FIXTURES.filter((f) => f.split === "held_out");
-    expect(tuning).toHaveLength(24);
-    expect(heldOut).toHaveLength(32);
+    expect(tuning).toHaveLength(28);
+    expect(heldOut).toHaveLength(36);
   });
 
   it("covers all 7 categories in both tuning and held_out splits", () => {
@@ -490,9 +490,9 @@ describe("EVAL_FIXTURES invariants", () => {
       "clara",
       "jun",
     ];
-    const present = new Set(EVAL_FIXTURES.map((f) => f.characterId));
+    const present = new Set<string>(EVAL_FIXTURES.map((f) => f.characterId));
     for (const char of allCharacters) {
-      expect(present.has(char as any)).toBe(true);
+      expect(present.has(char)).toBe(true);
     }
   });
 
