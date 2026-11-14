@@ -6,12 +6,16 @@ const PERSISTENT_PROFILE_DIR = path.resolve(
   ".cache/playwright-real-profile"
 );
 
-test("real single-pass DecisionModel runtime executes availability -> create -> decide -> destroy", async () => {
+test("real single-pass DecisionModel runtime executes availability -> create -> decide -> destroy", async ({
+  baseURL,
+}) => {
   test.setTimeout(300_000);
+  const origin = baseURL ?? "http://localhost:5173";
 
   const context = await chromium.launchPersistentContext(
     PERSISTENT_PROFILE_DIR,
     {
+      baseURL: origin,
       channel: "chrome",
       headless: true,
       args: [
@@ -31,12 +35,12 @@ test("real single-pass DecisionModel runtime executes availability -> create -> 
     page.on("request", (req) => {
       if (!trackingInferenceNetwork) return;
       const url = req.url();
-      if (!url.startsWith("http://localhost:5173")) {
+      if (!url.startsWith(origin)) {
         inferencePhaseExternalRequests.push(url);
       }
     });
 
-    await page.goto("/");
+    await page.goto(origin);
 
     const gpuCheck = await page.evaluate(async () => {
       const adapter = await navigator.gpu?.requestAdapter();

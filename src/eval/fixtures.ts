@@ -38,7 +38,7 @@ export type EvalFixture = {
 
 export const EVAL_FIXTURES: readonly EvalFixture[] = [
   // ==========================================
-  // TUNING SPLIT (24 fixtures)
+  // TUNING SPLIT (28 fixtures)
   // ==========================================
 
   // Category: yes (5 fixtures)
@@ -102,6 +102,18 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
     expectedOutcome: "answered",
     expectedAnswer: "Yes",
   },
+  {
+    id: "tune-yes-6",
+    split: "tuning",
+    category: "yes",
+    characterId: "theo",
+    question: "Are they men?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "true",
+    expectedContradictsNo: "false",
+    expectedOutcome: "answered",
+    expectedAnswer: "Yes",
+  },
 
   // Category: no (5 fixtures)
   {
@@ -158,6 +170,30 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
     category: "no",
     characterId: "omar",
     question: "Is this person a woman?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "false",
+    expectedContradictsNo: "true",
+    expectedOutcome: "answered",
+    expectedAnswer: "No",
+  },
+  {
+    id: "tune-no-6",
+    split: "tuning",
+    category: "no",
+    characterId: "theo",
+    question: "Are they women?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "false",
+    expectedContradictsNo: "true",
+    expectedOutcome: "answered",
+    expectedAnswer: "No",
+  },
+  {
+    id: "tune-no-7",
+    split: "tuning",
+    category: "no",
+    characterId: "theo",
+    question: "Are they translators?",
     expectedQuestionKind: "trait_question",
     expectedSupportsYes: "false",
     expectedContradictsNo: "true",
@@ -278,6 +314,18 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
     expectedOutcome: "answered",
     expectedAnswer: "No",
   },
+  {
+    id: "tune-neg-4",
+    split: "tuning",
+    category: "explicit_negation",
+    characterId: "theo",
+    question: "Do they start work before sunrise?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "false",
+    expectedContradictsNo: "true",
+    expectedOutcome: "answered",
+    expectedAnswer: "No",
+  },
 
   // Category: compound_or_ambiguous (3 fixtures)
   {
@@ -329,7 +377,7 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
   },
 
   // ==========================================
-  // HELD-OUT SPLIT (32 fixtures)
+  // HELD-OUT SPLIT (36 fixtures)
   // ==========================================
 
   // Category: yes (6 fixtures)
@@ -405,6 +453,18 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
     expectedOutcome: "answered",
     expectedAnswer: "Yes",
   },
+  {
+    id: "held-yes-7",
+    split: "held_out",
+    category: "yes",
+    characterId: "clara",
+    question: "Are they women?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "true",
+    expectedContradictsNo: "false",
+    expectedOutcome: "answered",
+    expectedAnswer: "Yes",
+  },
 
   // Category: no (6 fixtures)
   {
@@ -473,6 +533,30 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
     category: "no",
     characterId: "jun",
     question: "Is this person female?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "false",
+    expectedContradictsNo: "true",
+    expectedOutcome: "answered",
+    expectedAnswer: "No",
+  },
+  {
+    id: "held-no-7",
+    split: "held_out",
+    category: "no",
+    characterId: "theo",
+    question: "Do they work as a baker?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "false",
+    expectedContradictsNo: "true",
+    expectedOutcome: "answered",
+    expectedAnswer: "No",
+  },
+  {
+    id: "held-no-8",
+    split: "held_out",
+    category: "no",
+    characterId: "nora",
+    question: "Are they mechanics?",
     expectedQuestionKind: "trait_question",
     expectedSupportsYes: "false",
     expectedContradictsNo: "true",
@@ -623,6 +707,18 @@ export const EVAL_FIXTURES: readonly EvalFixture[] = [
     category: "explicit_negation",
     characterId: "jun",
     question: "Does this person own any pets?",
+    expectedQuestionKind: "trait_question",
+    expectedSupportsYes: "false",
+    expectedContradictsNo: "true",
+    expectedOutcome: "answered",
+    expectedAnswer: "No",
+  },
+  {
+    id: "held-neg-5",
+    split: "held_out",
+    category: "explicit_negation",
+    characterId: "sam",
+    question: "Do they start work before sunrise?",
     expectedQuestionKind: "trait_question",
     expectedSupportsYes: "false",
     expectedContradictsNo: "true",

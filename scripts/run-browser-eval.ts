@@ -9,7 +9,8 @@ import {
 import type { PolicyThresholds } from "../src/engine/types.ts";
 import type { EvalCaseResult, EvalRunResult } from "../src/eval/evalHarness.tsx";
 
-const BASE_URL = "http://localhost:5173";
+const DEFAULT_BASE_URL = "http://localhost:5173";
+const FALLBACK_BASE_URL = "http://localhost:5179";
 const PERSISTENT_PROFILE_DIR = path.resolve(
   process.cwd(),
   ".cache/playwright-real-profile"
@@ -25,22 +26,36 @@ function parseSplitArg(): "tuning" | "held_out" | "all" {
   return "all";
 }
 
-async function isServerRunning(url: string): Promise<boolean> {
+async function isAnyServerListening(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url);
-    return res.ok;
+    await fetch(url, { signal: AbortSignal.timeout(1500) });
+    return true;
   } catch {
     return false;
   }
 }
 
-async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
+async function isGuessWhoServerRunning(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
+    if (!res.ok) return false;
+    const html = await res.text();
+    return html.includes("Guess Who?");
+  } catch {
+    return false;
+  }
+}
+
+async function waitForGuessWhoServer(
+  url: string,
+  timeoutMs = 30_000
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await isServerRunning(url)) return;
+    if (await isGuessWhoServerRunning(url)) return;
     await new Promise((r) => setTimeout(r, 300));
   }
-  throw new Error(`Timed out waiting for Vite server at ${url}`);
+  throw new Error(`Timed out waiting for Guess Who? Vite server at ${url}`);
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -347,80 +362,100 @@ function formatReport(
 async function main(): Promise<void> {
   const split = parseSplitArg();
   let devServer: ChildProcess | null = null;
-
-  if (!(await isServerRunning(BASE_URL))) {
-    devServer = spawn("npm", ["run", "dev"], {
-      stdio: "ignore",
-      detached: false,
-    });
-    await waitForServer(BASE_URL);
-  }
-
-  const context = await chromium.launchPersistentContext(
-    PERSISTENT_PROFILE_DIR,
-    {
-      channel: "chrome",
-      headless: true,
-      args: [
-        "--enable-unsafe-webgpu",
-        "--use-angle=metal",
-        "--enable-features=Vulkan,UseSkiaRenderer",
-        "--ignore-gpu-blocklist",
-      ],
-    }
-  );
+  let baseUrl = DEFAULT_BASE_URL;
 
   try {
-    const page = context.pages()[0] ?? (await context.newPage());
-    await page.goto(`${BASE_URL}/?eval=1`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(
-      () => typeof window.__GUESS_WHO_EVAL__ !== "undefined",
-      { timeout: 15_000 }
-    );
-
-    const runResult = await page.evaluate(async (targetSplit) => {
-      return await window.__GUESS_WHO_EVAL__!.runSplit(targetSplit, {
-        warmups: 3,
+    if (await isGuessWhoServerRunning(DEFAULT_BASE_URL)) {
+      baseUrl = DEFAULT_BASE_URL;
+    } else if (!(await isAnyServerListening(DEFAULT_BASE_URL))) {
+      baseUrl = DEFAULT_BASE_URL;
+      devServer = spawn("npx", ["vite", "--port", "5173", "--strictPort"], {
+        stdio: "ignore",
+        detached: false,
       });
-    }, split);
-
-    if (split === "tuning") {
-      console.log(`=== Tuning Split Calibration (n=${runResult.results.length}) ===`);
-      for (const r of runResult.results) {
-        console.log(
-          `${r.fixture.id} [${r.fixture.category}/${r.fixture.characterId}] "${r.fixture.question}" => qk=${r.raw.question_kind.label}(${r.raw.question_kind.confidence}) yes=${r.raw.supports_yes.label}(${r.raw.supports_yes.confidence}) no=${r.raw.contradicts_no.label}(${r.raw.contradicts_no.confidence}) | exp=(${r.fixture.expectedQuestionKind}, yes=${r.fixture.expectedSupportsYes ?? "-"}, no=${r.fixture.expectedContradictsNo ?? "-"})`
-        );
-      }
-      const top = sweepTuningThresholds(runResult.results).slice(0, 5);
-      console.log("\nTop 5 Threshold Candidates on Tuning Split:");
-      for (const c of top) {
-        console.log(
-          `qk=${c.thresholds.questionKindThreshold.toFixed(2)} fact=${c.thresholds.factThreshold.toFixed(2)} => acceptedAcc=${pct(c.metrics.acceptedFactualAccuracy)} (${c.metrics.acceptedFactualCorrect}/${c.metrics.acceptedFactualTotal}), acceptRate=${pct(c.metrics.validTraitAcceptanceRate)}, unkToNo=${c.metrics.unknownToNoCount}, nonTrait=${c.metrics.nonTraitCorrectClarifications}/${c.metrics.nonTraitTotal}`
-        );
-      }
-      return;
+      await waitForGuessWhoServer(baseUrl);
+    } else {
+      baseUrl = FALLBACK_BASE_URL;
+      devServer = spawn("npx", ["vite", "--port", "5179", "--strictPort"], {
+        stdio: "ignore",
+        detached: false,
+      });
+      await waitForGuessWhoServer(baseUrl);
     }
 
-    const tuningCases = runResult.results.filter(
-      (r) => r.fixture.split === "tuning"
-    );
-    const heldOutCases = runResult.results.filter(
-      (r) => r.fixture.split === "held_out"
+    const context = await chromium.launchPersistentContext(
+      PERSISTENT_PROFILE_DIR,
+      {
+        channel: "chrome",
+        headless: true,
+        args: [
+          "--enable-unsafe-webgpu",
+          "--use-angle=metal",
+          "--enable-features=Vulkan,UseSkiaRenderer",
+          "--ignore-gpu-blocklist",
+        ],
+      }
     );
 
-    const tuningMetrics = computeMetrics(tuningCases, DEFAULT_THRESHOLDS);
-    const heldOutMetrics = computeMetrics(heldOutCases, DEFAULT_THRESHOLDS);
+    try {
+      const page = context.pages()[0] ?? (await context.newPage());
+      await page.goto(`${baseUrl}/?eval=1`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(
+        () => typeof window.__GUESS_WHO_EVAL__ !== "undefined",
+        { timeout: 15_000 }
+      );
 
-    const report = formatReport(
-      runResult,
-      tuningMetrics,
-      heldOutMetrics,
-      DEFAULT_THRESHOLDS
-    );
-    await fs.writeFile(REPORT_PATH, report, "utf8");
-    console.log(report);
+      const runResult = await page.evaluate(async (targetSplit) => {
+        const evalBridge = window.__GUESS_WHO_EVAL__;
+        if (!evalBridge) {
+          throw new Error("window.__GUESS_WHO_EVAL__ is not initialized.");
+        }
+        return await evalBridge.runSplit(targetSplit, {
+          warmups: 3,
+        });
+      }, split);
+
+      if (split === "tuning") {
+        console.log(
+          `=== Tuning Split Calibration (n=${runResult.results.length}) ===`
+        );
+        for (const r of runResult.results) {
+          console.log(
+            `${r.fixture.id} [${r.fixture.category}/${r.fixture.characterId}] "${r.fixture.question}" => qk=${r.raw.question_kind.label}(${r.raw.question_kind.confidence}) yes=${r.raw.supports_yes.label}(${r.raw.supports_yes.confidence}) no=${r.raw.contradicts_no.label}(${r.raw.contradicts_no.confidence}) | exp=(${r.fixture.expectedQuestionKind}, yes=${r.fixture.expectedSupportsYes ?? "-"}, no=${r.fixture.expectedContradictsNo ?? "-"})`
+          );
+        }
+        const top = sweepTuningThresholds(runResult.results).slice(0, 5);
+        console.log("\nTop 5 Threshold Candidates on Tuning Split:");
+        for (const c of top) {
+          console.log(
+            `qk=${c.thresholds.questionKindThreshold.toFixed(2)} fact=${c.thresholds.factThreshold.toFixed(2)} => acceptedAcc=${pct(c.metrics.acceptedFactualAccuracy)} (${c.metrics.acceptedFactualCorrect}/${c.metrics.acceptedFactualTotal}), acceptRate=${pct(c.metrics.validTraitAcceptanceRate)}, unkToNo=${c.metrics.unknownToNoCount}, nonTrait=${c.metrics.nonTraitCorrectClarifications}/${c.metrics.nonTraitTotal}`
+          );
+        }
+        return;
+      }
+
+      const tuningCases = runResult.results.filter(
+        (r) => r.fixture.split === "tuning"
+      );
+      const heldOutCases = runResult.results.filter(
+        (r) => r.fixture.split === "held_out"
+      );
+
+      const tuningMetrics = computeMetrics(tuningCases, DEFAULT_THRESHOLDS);
+      const heldOutMetrics = computeMetrics(heldOutCases, DEFAULT_THRESHOLDS);
+
+      const report = formatReport(
+        runResult,
+        tuningMetrics,
+        heldOutMetrics,
+        DEFAULT_THRESHOLDS
+      );
+      await fs.writeFile(REPORT_PATH, report, "utf8");
+      console.log(report);
+    } finally {
+      await context.close();
+    }
   } finally {
-    await context.close();
     if (devServer) {
       devServer.kill("SIGTERM");
     }

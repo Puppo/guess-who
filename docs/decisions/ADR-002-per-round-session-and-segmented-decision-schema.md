@@ -80,3 +80,16 @@ Each player turn evaluates an untrusted natural-language question (for example, 
   - Accepted factual answer accuracy: `100.0%` (`23/23`, `>= 90.0%` target **Pass**)
   - Gender questions (tuning + held-out): `8/8` (`100.0%`)
   - Warm inference latency: `223.7 ms` median, `277.8 ms` p95
+
+### Schema v3.1.0 Update (2026-11-14)
+
+- **Anchor-calibrated atomic bi-encoder schema (`embedding-gemma-v1`):** Chrome Canary `160` defaults `chrome://flags/#decisions-api` (`"Enabled"`) to `embedding-gemma-v1`, a mean-pooled dual-encoder (`title: ... | text: ...`) that suffers similarity dilution when multiple unrelated traits or roles are packed into 2–3 long option descriptions. `buildBiEncoderSchema()` in `src/engine/schema.ts` now splits `question_kind` into `13` single-intent `kind_*` options, `supports_yes` into `20` atomic options (gender, occupation, schedule, workplace), and `contradicts_no` into `17` atomic options (commute, hobbies, pets, plus optional custom facts `<= 26` options per `choice` question within Blink IDL limits of `<= 16` questions and `2..26` options), anchored by a shared `BI_ENCODER_ANCHOR_LABEL = "unk_other_topic"`. `normalizeBiEncoderDecision()` in `src/engine/decisionAdapter.ts` aggregates bucket maxima (`kind_trait_*`, `kind_identity_*`, `kind_rephrase_*`) on `question_kind` and computes log-odds relative to `unk_other_topic` across both factual partitions. Offline validation against real `onnx-community/embeddinggemma-300m-ONNX` (`q4`, softmax temp `0.05`) achieved `61/64` exact matches overall, `8/8` on Theo's Canary screenshot questions, `40/40` factual accuracy across all valid trait fixtures, and `0` `unknown`-to-`No` errors.
+- **Singular-`they` plural gender/occupation grounding & derived sunrise contradiction:** Updated `CHARACTERS` biographies (`src/data/characters.ts`), `deriveExplicitContradictions()`, and `buildCrossEncoderSchema()` (`src/engine/schema.ts`) so non-sunrise characters explicitly carry sunrise schedule status (daytime or night shifts vs. starting before sunrise), `contradicts_no` handles singular-`they` plural gender phrasing (*"Plural phrasing match: Are they men? -> Yes (not contradicted)"* / *"Are they women?"*), and `supports_yes` / `question_kind` handle plural gender and occupation prompts (`"Are they translators?"`).
+- **64-case WebGPU browser evaluation (`kev-0.6b`, `n = 36` held-out + `n = 28` tuning, thresholds `0.50` / `0.50`):**
+  - Tuning split (`n = 28`): `100.0% (23/23)` valid single-trait acceptance rate, `100.0% (23/23)` accepted factual accuracy, `0` `unknown`-to-`No` errors.
+  - Held-out raw `question_kind`: `88.9%`; raw `supports_yes`: `96.4%`; raw `contradicts_no`: `92.9%`.
+  - Held-out post-policy `unknown`-to-`No` errors: `0`
+  - Held-out valid-trait acceptance rate: `100.0%` (`28/28`, `>= 70.0%` target **Pass**)
+  - Held-out accepted factual answer accuracy: `92.9%` (`26/28`, `>= 90.0%` target **Pass**)
+  - Gender questions (tuning + held-out): `11/11` (`100.0%`)
+  - Warm inference latency: `269.9 ms` median, `290.8 ms` p95

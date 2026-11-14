@@ -11,7 +11,7 @@ Before presenting on stage or recording a demo video:
 1. **Environment:**
    - Operating System: macOS (Apple Silicon arm64 recommended for WebGPU Metal acceleration) or Linux/Windows with a supported WebGPU device.
    - Node.js: `v26.8.1` (`node -v` matching `.nvmrc`).
-   - Browser: Desktop Google Chrome (Chrome 157+) or Chrome Canary with `chrome://flags/#decisions-api` enabled (**"Enabled with All Backends"** or **"Enabled with Laya Backend (English WInt8)"** recommended; default **"Enabled"** `embedding-gemma-v1` is also supported via bi-encoder schema fallback).
+   - Browser: Desktop Google Chrome (Chrome 157+) or Chrome Canary with `chrome://flags/#decisions-api` enabled (**"Enabled with All Backends"** recommended to include cross-encoder backends; **"Enabled"** or **"Enabled with EmbeddingGemma V1"** uses the `embedding-gemma-v1` bi-encoder with Schema `v3.1.0`'s anchor-calibrated atomic `Choice` partition, and **"Enabled with Gemma 4 on CPU"** exposes `language-model`).
 2. **Warm-Up / Weight Cache:**
    - Launch dev server: `npm run dev` (starts on `http://localhost:5173`).
    - Open Chrome to `http://localhost:5173`.
@@ -60,7 +60,7 @@ The 12 fictional characters each have 6 to 8 concise, written biographical facts
      - **`"No"`** (for the remaining 8 characters — Milo, Ada, Theo, Sam, Omar, Lin, Clara, or Jun — who all explicitly do not work at night).
    - The `questionCount` counter increments from `0` to `1`.
 3. **Key Point to Mention:**
-   - Emphasize that the response was computed in a single forward pass in ~220 ms without generating tokens or calling an external API.
+   - Emphasize that the response was computed in a single forward pass in ~270 ms without generating tokens or calling an external API.
 
 ---
 
@@ -78,7 +78,7 @@ The 12 fictional characters each have 6 to 8 concise, written biographical facts
 3. **Key Point to Mention:**
    - The schema splits verification into two orthogonal questions: `supports_yes` and `contradicts_no`.
    - When a trait is simply omitted, both resolve to `false`. The application policy recognizes this as `"Not enough information"` rather than hallucinating `"No"`.
-   - In our empirical evaluation over 56 test cases, this architecture achieved **0 post-policy `unknown`-to-`No` errors**.
+   - In our empirical evaluation over 64 test cases (28 tuning + 36 held-out), this architecture achieved **0 post-policy `unknown`-to-`No` errors**.
 
 ---
 
@@ -108,7 +108,7 @@ The 12 fictional characters each have 6 to 8 concise, written biographical facts
 2. **Point out the Runtime & Timings section:**
    - **Engine Identity:** `Polyfill (open-jev · kev-0.6b)` on `webgpu` (or `Native DecisionModel`).
    - **Round `create()` Duration:** Displayed as **`< 0.1 ms`** (`0.00 ms`). Explain: the weights remain resident in WebGPU memory; creating a new round session only constructs the in-memory schema without reloading weights.
-   - **Inference Duration:** ~`224 ms` warm single-pass execution.
+   - **Inference Duration:** ~`270 ms` warm single-pass execution.
 3. **Point out the Latest Decision Output:**
    - Show the winning labels and probability bars for:
      - `question_kind` (`trait_question`, `identity_guess`, or `needs_rephrase`).

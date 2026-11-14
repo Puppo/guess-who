@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { CHARACTERS } from "../../src/data/characters.ts";
 import {
   createDecisionEngineAdapter,
+  normalizeBiEncoderDecision,
   validateRawRoundDecision,
 } from "../../src/engine/decisionAdapter.ts";
+import { evaluateDecisionPolicy } from "../../src/engine/policy.ts";
+import { BI_ENCODER_ANCHOR_LABEL, buildRoundSchema } from "../../src/engine/schema.ts";
 import {
   type DecisionAvailabilityOptions,
   type DecisionCreateOptions,
@@ -512,6 +516,312 @@ describe("decisionAdapter", () => {
         (q) => q.id === "supports_yes"
       );
       expect(supportsYes?.type).toBe("boolean");
+    });
+  });
+
+  describe("bi-encoder atomic schema limits and anchor-calibrated normalization", () => {
+    it("keeps every character's bi-encoder schema within Chrome Canary Blink IDL limits", () => {
+      for (const char of CHARACTERS) {
+        const schema = buildRoundSchema(char.facts, { variant: "bi-encoder" });
+        expect(schema.questions.length).toBeGreaterThanOrEqual(1);
+        expect(schema.questions.length).toBeLessThanOrEqual(16);
+
+        for (const q of schema.questions) {
+          if (q.type === "choice") {
+            expect(q.options.length).toBeGreaterThanOrEqual(2);
+            expect(q.options.length).toBeLessThanOrEqual(26);
+          }
+        }
+
+        const supportsYes = schema.questions.find(
+          (q) => q.id === "supports_yes"
+        );
+        const contradictsNo = schema.questions.find(
+          (q) => q.id === "contradicts_no"
+        );
+        expect(supportsYes?.type).toBe("choice");
+        expect(contradictsNo?.type).toBe("choice");
+        if (supportsYes?.type === "choice" && contradictsNo?.type === "choice") {
+          expect(supportsYes.prompt).toBe(contradictsNo.prompt);
+          expect(
+            supportsYes.options.some((o) => o.label === BI_ENCODER_ANCHOR_LABEL)
+          ).toBe(true);
+          expect(
+            contradictsNo.options.some(
+              (o) => o.label === BI_ENCODER_ANCHOR_LABEL
+            )
+          ).toBe(true);
+        }
+      }
+    });
+
+    it("normalizes atomic bi-encoder option distributions into Yes, No, and Not enough information", async () => {
+      const kindDecision = {
+        id: "question_kind",
+        label: "trait_question",
+        confidence: 0.9,
+        probabilities: {
+          trait_question: 0.9,
+          identity_guess: 0.05,
+          needs_rephrase: 0.05,
+        },
+      };
+
+      const yesNormalized = validateRawRoundDecision(
+        normalizeBiEncoderDecision({
+          question_kind: kindDecision,
+          supports_yes: {
+            id: "supports_yes",
+            label: "yes_gender_man",
+            confidence: 0.72,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.02,
+              yes_gender_man: 0.72,
+              no_gender_woman: 0.08,
+            },
+          },
+          contradicts_no: {
+            id: "contradicts_no",
+            label: BI_ENCODER_ANCHOR_LABEL,
+            confidence: 0.25,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.25,
+              unk_hobby_hiking: 0.1,
+            },
+          },
+        })
+      );
+      expect(evaluateDecisionPolicy(yesNormalized)).toMatchObject({
+        outcome: "answered",
+        answer: "Yes",
+      });
+
+      const noNormalized = validateRawRoundDecision(
+        normalizeBiEncoderDecision({
+          question_kind: kindDecision,
+          supports_yes: {
+            id: "supports_yes",
+            label: "no_job_baker",
+            confidence: 0.68,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.03,
+              yes_job_illustrator: 0.02,
+              no_job_baker: 0.68,
+            },
+          },
+          contradicts_no: {
+            id: "contradicts_no",
+            label: BI_ENCODER_ANCHOR_LABEL,
+            confidence: 0.3,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.3,
+              no_pet_any: 0.05,
+            },
+          },
+        })
+      );
+      expect(evaluateDecisionPolicy(noNormalized)).toMatchObject({
+        outcome: "answered",
+        answer: "No",
+      });
+
+      const unknownNormalized = validateRawRoundDecision(
+        normalizeBiEncoderDecision({
+          question_kind: kindDecision,
+          supports_yes: {
+            id: "supports_yes",
+            label: BI_ENCODER_ANCHOR_LABEL,
+            confidence: 0.4,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.4,
+              yes_job_illustrator: 0.02,
+              no_job_baker: 0.03,
+            },
+          },
+          contradicts_no: {
+            id: "contradicts_no",
+            label: "unk_hobby_sourdough",
+            confidence: 0.65,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.08,
+              unk_hobby_sourdough: 0.65,
+              no_hobby_camping: 0.02,
+            },
+          },
+        })
+      );
+      expect(evaluateDecisionPolicy(unknownNormalized)).toMatchObject({
+        outcome: "unknown",
+        answer: "Not enough information",
+      });
+
+      // End-to-end through createRoundSession when native backend is embedding-gemma-v1
+      const nativeMock: DecisionModelStatic = {
+        async availability(opts) {
+          return opts?.devTrialBackend === "embedding-gemma-v1"
+            ? "available"
+            : "unavailable";
+        },
+        async create() {
+          return {
+            async decide() {
+              return {
+                question_kind: kindDecision,
+                supports_yes: {
+                  id: "supports_yes",
+                  label: BI_ENCODER_ANCHOR_LABEL,
+                  confidence: 0.3,
+                  probabilities: {
+                    [BI_ENCODER_ANCHOR_LABEL]: 0.3,
+                    yes_gender_man: 0.02,
+                  },
+                },
+                contradicts_no: {
+                  id: "contradicts_no",
+                  label: "no_pet_any",
+                  confidence: 0.78,
+                  probabilities: {
+                    [BI_ENCODER_ANCHOR_LABEL]: 0.04,
+                    no_pet_any: 0.78,
+                    yes_hobby_chess: 0.02,
+                  },
+                },
+              };
+            },
+            destroy() {},
+          };
+        },
+      };
+
+      const adapter = createDecisionEngineAdapter({
+        nativeDecisionModel: nativeMock,
+      });
+      await adapter.checkAvailability();
+      const session = await adapter.createRoundSession([
+        "Is a man (male)",
+        "Explicitly owns no pets",
+      ]);
+      const { raw } = await session.decide("Do they own a pet?");
+      expect(raw.contradicts_no.label).toBe("true");
+      expect(raw.supports_yes.label).toBe("false");
+    });
+
+    it("aggregates atomic kind_* question_kind options into canonical buckets while preserving standard 3-label mocks", () => {
+      const atomicTraitKind = validateRawRoundDecision(
+        normalizeBiEncoderDecision({
+          question_kind: {
+            id: "question_kind",
+            label: "kind_trait_job_a",
+            confidence: 0.62,
+            probabilities: {
+              kind_trait_gender: 0.04,
+              kind_trait_job_a: 0.62,
+              kind_trait_job_b: 0.1,
+              kind_identity_secret: 0.08,
+              kind_identity_direct: 0.05,
+              kind_rephrase_open: 0.06,
+              kind_rephrase_compound: 0.05,
+            },
+          },
+          supports_yes: {
+            id: "supports_yes",
+            label: BI_ENCODER_ANCHOR_LABEL,
+            confidence: 0.4,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.4,
+              no_job_translator: 0.85,
+            },
+          },
+          contradicts_no: {
+            id: "contradicts_no",
+            label: BI_ENCODER_ANCHOR_LABEL,
+            confidence: 0.35,
+            probabilities: {
+              [BI_ENCODER_ANCHOR_LABEL]: 0.35,
+              yes_hobby_chess: 0.02,
+            },
+          },
+        })
+      );
+      expect(atomicTraitKind.question_kind.label).toBe("trait_question");
+      expect(atomicTraitKind.question_kind.confidence).toBeCloseTo(0.8158, 4);
+      expect(atomicTraitKind.contradicts_no.label).toBe("true");
+      expect(evaluateDecisionPolicy(atomicTraitKind)).toMatchObject({
+        outcome: "answered",
+        answer: "No",
+      });
+
+      const atomicIdentityKind = validateRawRoundDecision(
+        normalizeBiEncoderDecision({
+          question_kind: {
+            id: "question_kind",
+            label: "kind_identity_secret",
+            confidence: 0.7,
+            probabilities: {
+              kind_trait_gender: 0.05,
+              kind_identity_secret: 0.7,
+              kind_identity_direct: 0.15,
+              kind_rephrase_open: 0.1,
+            },
+          },
+          supports_yes: {
+            id: "supports_yes",
+            label: "false",
+            confidence: 0.9,
+            probabilities: { true: 0.1, false: 0.9 },
+          },
+          contradicts_no: {
+            id: "contradicts_no",
+            label: "false",
+            confidence: 0.9,
+            probabilities: { true: 0.1, false: 0.9 },
+          },
+        })
+      );
+      expect(atomicIdentityKind.question_kind.label).toBe("identity_guess");
+      expect(atomicIdentityKind.question_kind.confidence).toBeCloseTo(
+        0.7 / (0.05 + 0.7 + 0.1),
+        4
+      );
+      expect(evaluateDecisionPolicy(atomicIdentityKind)).toMatchObject({
+        outcome: "clarification",
+        message:
+          "To guess a specific character, select their card and confirm 'Make my guess'.",
+      });
+
+      const atomicRephraseKind = validateRawRoundDecision(
+        normalizeBiEncoderDecision({
+          question_kind: {
+            id: "question_kind",
+            label: "kind_rephrase_compound",
+            confidence: 0.55,
+            probabilities: {
+              kind_trait_schedule: 0.15,
+              kind_identity_direct: 0.1,
+              kind_rephrase_compound: 0.55,
+              kind_rephrase_open: 0.2,
+            },
+          },
+          supports_yes: {
+            id: "supports_yes",
+            label: "false",
+            confidence: 0.9,
+            probabilities: { true: 0.1, false: 0.9 },
+          },
+          contradicts_no: {
+            id: "contradicts_no",
+            label: "false",
+            confidence: 0.9,
+            probabilities: { true: 0.1, false: 0.9 },
+          },
+        })
+      );
+      expect(atomicRephraseKind.question_kind.label).toBe("needs_rephrase");
+      expect(evaluateDecisionPolicy(atomicRephraseKind)).toMatchObject({
+        outcome: "clarification",
+        message:
+          "Ask one yes/no question at a time about written biographical traits.",
+      });
     });
   });
 });

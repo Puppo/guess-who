@@ -15,7 +15,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Nora in an observatory jacket at twilight",
     biography:
-      "Nora is a woman who works as an astronomer onsite at a hilltop observatory, where she regularly works at night. Away from the telescope, she enjoys hiking and camping, and she owns a cat.",
+      "Nora is a woman who works as an astronomer onsite at a hilltop observatory, where she regularly works at night and does not start work before sunrise. Away from the telescope, she enjoys hiking and camping, and she owns a cat.",
     facts: [
       "Is a woman (female)",
       "Works as an astronomer",
@@ -52,7 +52,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Ada in a workshop with vintage radios",
     biography:
-      "Ada is a woman who works daytime hours as a mechanic, explicitly does not work at night, and often repairs old radios. During her leisure time, she enjoys camping, and she owns a dog.",
+      "Ada is a woman who works daytime hours as a mechanic, does not start work before sunrise, and explicitly does not work at night. She often repairs old radios, enjoys camping, and owns a dog.",
     facts: [
       "Is a woman (female)",
       "Works as a mechanic",
@@ -69,7 +69,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Theo in a sunlit home illustration studio",
     biography:
-      "Theo is a man who works as an illustrator from home and explicitly does not work at night. During leisure hours, he plays chess, explicitly dislikes camping, and explicitly owns no pets.",
+      "Theo is a man who works daytime hours as an illustrator from home, does not start work before sunrise, and explicitly does not work at night. During leisure hours, he plays chess, explicitly dislikes camping, and explicitly owns no pets.",
     facts: [
       "Is a man (male)",
       "Works as an illustrator",
@@ -87,7 +87,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Priya in a paramedic responder jacket at night",
     biography:
-      "Priya is a woman who works as an emergency paramedic and regularly works at night. She travels by bicycle and enjoys distance running, though she explicitly dislikes camping and explicitly owns no pets.",
+      "Priya is a woman who works as an emergency paramedic and regularly works at night rather than starting before sunrise. She travels by bicycle and enjoys distance running, though she explicitly dislikes camping and explicitly owns no pets.",
     facts: [
       "Is a woman (female)",
       "Works as an emergency paramedic",
@@ -105,7 +105,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Sam in a coastal field jacket by the ocean",
     biography:
-      "Sam is a man who works as a marine biologist during daytime hours and explicitly does not work at night. When taking time off, he enjoys camping and plays acoustic guitar, and at home he owns a cat.",
+      "Sam is a man who works as a marine biologist during daytime hours, does not start work before sunrise, and explicitly does not work at night. When taking time off, he enjoys camping and plays acoustic guitar, and at home he owns a cat.",
     facts: [
       "Is a man (male)",
       "Works as a marine biologist",
@@ -122,7 +122,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Elena in an evening blazer near a grand piano",
     biography:
-      "Elena is a woman who works as a jazz pianist and regularly works at night. She lives in a downtown apartment where she bakes sourdough bread, explicitly dislikes camping, and explicitly owns no pets.",
+      "Elena is a woman who works as a jazz pianist and regularly works at night rather than starting before sunrise. She lives in a downtown apartment where she bakes sourdough bread, explicitly dislikes camping, and explicitly owns no pets.",
     facts: [
       "Is a woman (female)",
       "Works as a jazz pianist",
@@ -140,7 +140,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Omar in a home study with vintage watch dials",
     biography:
-      "Omar is a man who works from home as an accessibility consultant and explicitly does not work at night. In his spare time, he repairs vintage watches, enjoys hiking and camping, and owns a dog.",
+      "Omar is a man who works daytime hours from home as an accessibility consultant, does not start work before sunrise, and explicitly does not work at night. In his spare time, he repairs vintage watches, enjoys hiking and camping, and owns a dog.",
     facts: [
       "Is a man (male)",
       "Works as an accessibility consultant",
@@ -178,7 +178,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Mateo near a live venue mixing console",
     biography:
-      "Mateo is a man who works as a live-venue sound engineer and regularly works at night. He travels by bicycle, plays acoustic guitar, explicitly dislikes camping, and explicitly owns no pets.",
+      "Mateo is a man who works as a live-venue sound engineer and regularly works at night rather than starting before sunrise. He travels by bicycle, plays acoustic guitar, explicitly dislikes camping, and explicitly owns no pets.",
     facts: [
       "Is a man (male)",
       "Works as a live-venue sound engineer",
@@ -215,7 +215,7 @@ export const CHARACTERS: readonly Character[] = [
     avatarAlt:
       "Editorial portrait photo of Jun in a home study with a vintage film camera",
     biography:
-      "Jun is a man who works as a technical translator from home and explicitly does not work at night. For hobbies, he plays chess and repairs old film cameras, explicitly dislikes camping, and explicitly owns no pets.",
+      "Jun is a man who works daytime hours as a technical translator from home, does not start work before sunrise, and explicitly does not work at night. For hobbies, he plays chess and repairs old film cameras, explicitly dislikes camping, and explicitly owns no pets.",
     facts: [
       "Is a man (male)",
       "Works as a technical translator",

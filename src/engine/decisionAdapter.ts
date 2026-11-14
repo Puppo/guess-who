@@ -12,7 +12,7 @@ import type {
   RoundSession,
 } from "./types.ts";
 import { MalformedDecisionError } from "./types.ts";
-import { buildRoundSchema } from "./schema.ts";
+import { BI_ENCODER_ANCHOR_LABEL, buildRoundSchema } from "./schema.ts";
 
 const NATIVE_BACKEND_PRIORITY: readonly DecisionDevTrialBackend[] = [
   "laya-en-wint8",
@@ -236,6 +236,260 @@ export function validateRawRoundDecision(raw: unknown): RawRoundDecision {
   };
 }
 
+function hasStandardQuestionKindProbabilities(candidate: unknown): boolean {
+  if (!candidate || typeof candidate !== "object") {
+    return false;
+  }
+  const probs = (candidate as Record<string, unknown>).probabilities;
+  if (!probs || typeof probs !== "object") {
+    return false;
+  }
+  const rec = probs as Record<string, unknown>;
+  return (
+    isFiniteUnitScore(rec.trait_question) &&
+    isFiniteUnitScore(rec.identity_guess) &&
+    isFiniteUnitScore(rec.needs_rephrase)
+  );
+}
+
+function normalizeBiEncoderQuestionKind(candidate: unknown): unknown {
+  if (hasStandardQuestionKindProbabilities(candidate)) {
+    return candidate;
+  }
+  if (!candidate || typeof candidate !== "object") {
+    throw new MalformedDecisionError(
+      'Decision for "question_kind" must be a non-null object.'
+    );
+  }
+  const rec = candidate as Record<string, unknown>;
+  if (rec.id !== undefined && rec.id !== "question_kind") {
+    throw new MalformedDecisionError(
+      `Decision id mismatch for "question_kind": received "${String(rec.id)}".`
+    );
+  }
+  if (!isFiniteUnitScore(rec.confidence)) {
+    throw new MalformedDecisionError(
+      `Invalid confidence "${String(rec.confidence)}" for "question_kind".`
+    );
+  }
+  if (!rec.probabilities || typeof rec.probabilities !== "object") {
+    throw new MalformedDecisionError(
+      'Missing probabilities object for "question_kind".'
+    );
+  }
+
+  const rawProbs = rec.probabilities as Record<string, unknown>;
+  let maxTrait = 0;
+  let maxIdentity = 0;
+  let maxRephrase = 0;
+  let hasKindKey = false;
+
+  for (const [label, prob] of Object.entries(rawProbs)) {
+    if (!isFiniteUnitScore(prob)) {
+      throw new MalformedDecisionError(
+        `Invalid probability for "question_kind.${label}": ${String(prob)}.`
+      );
+    }
+    if (label.startsWith("kind_trait_")) {
+      hasKindKey = true;
+      if (prob > maxTrait) maxTrait = prob;
+    } else if (label.startsWith("kind_identity_")) {
+      hasKindKey = true;
+      if (prob > maxIdentity) maxIdentity = prob;
+    } else if (label.startsWith("kind_rephrase_")) {
+      hasKindKey = true;
+      if (prob > maxRephrase) maxRephrase = prob;
+    }
+  }
+
+  const sum3 = maxTrait + maxIdentity + maxRephrase;
+  if (!hasKindKey || sum3 <= 0) {
+    return candidate;
+  }
+
+  const pTrait = round4(maxTrait / sum3);
+  const pIdentity = round4(maxIdentity / sum3);
+  const pRephrase = round4(maxRephrase / sum3);
+
+  let winningLabel: QuestionKindLabel = "trait_question";
+  let winningProb = pTrait;
+  if (maxIdentity > maxTrait && maxIdentity >= maxRephrase) {
+    winningLabel = "identity_guess";
+    winningProb = pIdentity;
+  } else if (maxRephrase > maxTrait && maxRephrase > maxIdentity) {
+    winningLabel = "needs_rephrase";
+    winningProb = pRephrase;
+  }
+
+  return {
+    id: "question_kind",
+    label: winningLabel,
+    confidence: winningProb,
+    probabilities: {
+      trait_question: pTrait,
+      identity_guess: pIdentity,
+      needs_rephrase: pRephrase,
+    },
+  };
+}
+
+function hasBooleanProbabilities(candidate: unknown): boolean {
+  if (!candidate || typeof candidate !== "object") {
+    return false;
+  }
+  const probs = (candidate as Record<string, unknown>).probabilities;
+  if (!probs || typeof probs !== "object") {
+    return false;
+  }
+  const rec = probs as Record<string, unknown>;
+  return isFiniteUnitScore(rec.true) && isFiniteUnitScore(rec.false);
+}
+
+function extractAnchorRelativeLogs(
+  candidate: unknown,
+  questionId: string
+): Array<{ label: string; logRatio: number }> {
+  if (!candidate || typeof candidate !== "object") {
+    throw new MalformedDecisionError(
+      `Decision for "${questionId}" must be a non-null object.`
+    );
+  }
+  const rec = candidate as Record<string, unknown>;
+  if (rec.id !== undefined && rec.id !== questionId) {
+    throw new MalformedDecisionError(
+      `Decision id mismatch for "${questionId}": received "${String(rec.id)}".`
+    );
+  }
+  if (!isFiniteUnitScore(rec.confidence)) {
+    throw new MalformedDecisionError(
+      `Invalid confidence "${String(rec.confidence)}" for "${questionId}".`
+    );
+  }
+  if (!rec.probabilities || typeof rec.probabilities !== "object") {
+    throw new MalformedDecisionError(
+      `Missing probabilities object for "${questionId}".`
+    );
+  }
+
+  const rawProbs = rec.probabilities as Record<string, unknown>;
+  const anchorRaw = rawProbs[BI_ENCODER_ANCHOR_LABEL];
+  if (!isFiniteUnitScore(anchorRaw) || anchorRaw <= 0) {
+    throw new MalformedDecisionError(
+      `Invalid anchor probability for "${questionId}.${BI_ENCODER_ANCHOR_LABEL}": ${String(anchorRaw)}.`
+    );
+  }
+
+  const logAnchor = Math.log(Math.max(1e-12, anchorRaw));
+  const result: Array<{ label: string; logRatio: number }> = [];
+
+  for (const [label, prob] of Object.entries(rawProbs)) {
+    if (!isFiniteUnitScore(prob)) {
+      throw new MalformedDecisionError(
+        `Invalid probability for "${questionId}.${label}": ${String(prob)}.`
+      );
+    }
+    result.push({
+      label,
+      logRatio: Math.log(Math.max(1e-12, prob)) - logAnchor,
+    });
+  }
+
+  return result;
+}
+
+function stableSigmoid(x: number): number {
+  const clamped = Math.max(-60, Math.min(60, x));
+  return 1 / (1 + Math.exp(-clamped));
+}
+
+export function normalizeBiEncoderDecision(
+  raw: unknown,
+  sharpness = 1
+): unknown {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const record = raw as Record<string, unknown>;
+  const standardKind = hasStandardQuestionKindProbabilities(
+    record.question_kind
+  );
+  const booleanFacts =
+    hasBooleanProbabilities(record.supports_yes) &&
+    hasBooleanProbabilities(record.contradicts_no);
+
+  if (standardKind && booleanFacts) {
+    return raw;
+  }
+
+  const normalizedQuestionKind = normalizeBiEncoderQuestionKind(
+    record.question_kind
+  );
+
+  if (booleanFacts) {
+    return {
+      question_kind: normalizedQuestionKind,
+      supports_yes: record.supports_yes,
+      contradicts_no: record.contradicts_no,
+    };
+  }
+
+  const entries = [
+    ...extractAnchorRelativeLogs(record.supports_yes, "supports_yes"),
+    ...extractAnchorRelativeLogs(record.contradicts_no, "contradicts_no"),
+  ];
+
+  let maxYes = Number.NEGATIVE_INFINITY;
+  let maxNo = Number.NEGATIVE_INFINITY;
+  let maxUnk = 0; // Anchor label unk_other_topic always has logRatio === 0
+
+  for (const { label, logRatio } of entries) {
+    if (label.startsWith("yes_")) {
+      if (logRatio > maxYes) maxYes = logRatio;
+    } else if (label.startsWith("no_")) {
+      if (logRatio > maxNo) maxNo = logRatio;
+    } else if (label.startsWith("unk_")) {
+      if (logRatio > maxUnk) maxUnk = logRatio;
+    }
+  }
+
+  const k = Number.isFinite(sharpness) && sharpness > 0 ? sharpness : 1;
+  const pYes = Number.isFinite(maxYes)
+    ? round4(stableSigmoid(k * (maxYes - Math.max(maxNo, maxUnk))))
+    : 0;
+  const pYesFalse = round4(1 - pYes);
+
+  const pNo = Number.isFinite(maxNo)
+    ? round4(stableSigmoid(k * (maxNo - Math.max(maxYes, maxUnk))))
+    : 0;
+  const pNoFalse = round4(1 - pNo);
+
+  const yesWins = pYes > 0.5;
+  const noWins = pNo > 0.5;
+
+  return {
+    question_kind: normalizedQuestionKind,
+    supports_yes: {
+      id: "supports_yes",
+      label: yesWins ? "true" : "false",
+      confidence: round4(yesWins ? pYes : pYesFalse),
+      probabilities: {
+        true: pYes,
+        false: pYesFalse,
+      },
+    },
+    contradicts_no: {
+      id: "contradicts_no",
+      label: noWins ? "true" : "false",
+      confidence: round4(noWins ? pNo : pNoFalse),
+      probabilities: {
+        true: pNo,
+        false: pNoFalse,
+      },
+    },
+  };
+}
+
 async function defaultHasWebGpuAdapter(): Promise<boolean> {
   if (typeof navigator === "undefined" || !("gpu" in navigator) || !navigator.gpu) {
     return false;
@@ -331,8 +585,8 @@ export function createDecisionEngineAdapter(
   const loadOpenJevModule = options.loadOpenJevModule ?? defaultLoadOpenJevModule;
 
   let activeMode: "native" | "polyfill" | "unavailable" = "unavailable";
-  let selectedNativeBackend: DecisionDevTrialBackend | undefined = undefined;
-  let nativeModelId: string | undefined = undefined;
+  let selectedNativeBackend: DecisionDevTrialBackend | undefined;
+  let nativeModelId: string | undefined;
   let backendIdentity: BackendIdentity = {
     kind: "unavailable",
     badgeLabel: "Unavailable",
@@ -678,7 +932,11 @@ export function createDecisionEngineAdapter(
               decideOpts.signal
             );
             const inferenceDurationMs = performance.now() - t0;
-            const raw = validateRawRoundDecision(rawResponse);
+            const normalizedResponse =
+              selectedNativeBackend === "embedding-gemma-v1"
+                ? normalizeBiEncoderDecision(rawResponse)
+                : rawResponse;
+            const raw = validateRawRoundDecision(normalizedResponse);
             return { raw, inferenceDurationMs };
           },
           destroy() {
